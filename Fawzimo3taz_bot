@@ -1,0 +1,52 @@
+import os
+import asyncio
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+import yt_dlp
+
+# 8702778098:AAGiyBAnnrRO7Jjq_LumQDPngw-CLh1Q_IIBotFather
+TOKEN = 'YOUR_BOT_TOKEN'
+
+# إعدادات التحميل (تلقائية لأفضل جودة MP4)
+YDL_OPTS = {
+    'format': 'best[ext=mp4]/best',
+    'outtmpl': '%(title)s.%(ext)s',
+    'restrictfilenames': True,
+    'noplaylist': True,
+}
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("مرحباً! أرسل لي أي رابط فيديو (TikTok, Instagram, YouTube) وسأرسله لك فوراً.")
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    url = update.message.text
+    if not url.startswith("http"):
+        return
+
+    status = await update.message.reply_text("⏳ جاري المعالجة والتحميل...")
+
+    try:
+        with yt_dlp.YoutubeDL(YDL_OPTS) as ydl:
+            info = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info)
+
+        await status.edit_text("📤 جاري الرفع إلى تلجرام...")
+        
+        with open(filename, 'rb') as video:
+            await update.message.reply_video(video=video, caption="تم التحميل بواسطة بوتك الخاص ✅")
+        
+        os.remove(filename) # حذف الملف لتوفير مساحة السيرفر
+        await status.delete()
+
+    except Exception as e:
+        await status.edit_text(f"❌ عذراً، حدث خطأ: {str(e)}")
+
+def main():
+    app = Application.builder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    print("البوت يعمل الآن...")
+    app.run_polling()
+
+if __name__ == '__main__':
+    main()
